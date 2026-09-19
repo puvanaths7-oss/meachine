@@ -15,6 +15,20 @@ api_key = os.getenv("GEMINI_API_KEY")
 client = genai.Client(api_key=api_key) if api_key else None
 
 
+def get_client():
+    global client, api_key
+    current_key = os.getenv("GEMINI_API_KEY")
+    if not current_key:
+        load_dotenv(override=True)
+        current_key = os.getenv("GEMINI_API_KEY")
+
+    if current_key and (client is None or current_key != api_key):
+        api_key = current_key
+        client = genai.Client(api_key=api_key)
+
+    return client
+
+
 @app.route("/")
 def index():
     return render_template("index.html", chatbot_title=CHATBOT_TITLE)
@@ -28,11 +42,12 @@ def chat():
     if not user_message:
         return jsonify({"error": "Please enter a question."}), 400
 
-    if not api_key:
+    active_client = get_client()
+    if not active_client:
         return jsonify({"error": "GEMINI_API_KEY is not configured in the .env file."}), 500
 
     try:
-        response = client.models.generate_content(
+        response = active_client.models.generate_content(
             model=MODEL_NAME,
             contents=user_message,
             config=types.GenerateContentConfig(
